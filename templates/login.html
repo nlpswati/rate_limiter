@@ -1,6 +1,116 @@
-<h2>Login</h2>
-<form method="post">
-  Username: <input type="text" name="username"/><br/>
-  Password: <input type="password" name="password"/><br/>
-  <button type="submit">Login</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login • Rate Limiter</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22d3ee; --accent-2:#60a5fa; --btn:#2563eb; --btn-hover:#1d4ed8; --danger:#ef4444; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; color:var(--text); background: radial-gradient(1200px 800px at 80% -10%, rgba(34,211,238,.15), transparent 40%), radial-gradient(1000px 700px at -20% 10%, rgba(96,165,250,.12), transparent 45%), var(--bg); min-height:100vh; display:flex; }
+    a { color:inherit; text-decoration:none; }
+    .container { display:grid; place-items:center; width:100%; padding:28px; }
+    .nav { position:fixed; top:16px; left:50%; transform:translateX(-50%); width:min(980px, calc(100% - 32px)); display:flex; justify-content:space-between; align-items:center; background:rgba(17,24,39,.6); backdrop-filter: blur(8px); border:1px solid rgba(148,163,184,.18); border-radius:14px; padding:10px 14px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.3px; }
+    .logo { width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); display:grid; place-items:center; font-size:16px; color:#0b1220; font-weight:900; }
+    .link { padding:8px 12px; border-radius:10px; color:var(--text); border:1px solid transparent; transition:.2s ease; }
+    .link:hover { background:rgba(148,163,184,.08); border-color:rgba(148,163,184,.18); }
+    .card { width:min(460px, 100%); margin-top:80px; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00)); border:1px solid rgba(148,163,184,.18); border-radius:16px; padding:22px; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+    h1 { margin:4px 0 2px; font-size:28px; }
+    .sub { color:var(--muted); margin:0 0 14px; font-size:14px; }
+    form { display:grid; gap:12px; }
+    .field { display:grid; gap:6px; }
+    label { color:var(--muted); font-size:13px; }
+    .input { display:flex; align-items:center; gap:8px; background:rgba(17,24,39,.6); border:1px solid rgba(148,163,184,.2); border-radius:12px; padding:10px 12px; transition:.2s; }
+    .input:focus-within { border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(96,165,250,.2); }
+    input[type="text"], input[type="password"] { appearance:none; background:transparent; border:none; outline:none; color:var(--text); width:100%; font-size:14px; }
+    .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:6px; }
+    .btn { padding:10px 14px; border-radius:12px; border:1px solid rgba(148,163,184,.18); background:var(--btn); color:#fff; cursor:pointer; transition:.2s; font-weight:600; }
+    .btn:hover { background:var(--btn-hover); transform:translateY(-1px); }
+    .muted { color:var(--muted); font-size:13px; }
+    .error { display:none; color:#fff; background:linear-gradient(180deg, rgba(239,68,68,.15), rgba(239,68,68,.05)); border:1px solid rgba(239,68,68,.35); padding:8px 10px; border-radius:10px; font-size:13px; }
+    .toggle { cursor:pointer; font-size:12px; color:var(--muted); padding:4px 8px; border-radius:8px; border:1px solid rgba(148,163,184,.18); }
+    .toggle:hover { color:var(--text); background:rgba(148,163,184,.08); }
+    .hint { color:var(--muted); font-size:12px; margin-top:-2px; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="nav" aria-label="Primary">
+    <div class="brand"><div class="logo" aria-hidden>RL</div>Rate Limiter</div>
+    <div>
+      <a class="link" href="/">Home</a>
+      <a class="link" href="/register">Register</a>
+    </div>
+  </nav>
+  <div class="container">
+    <section class="card" aria-labelledby="login-title">
+      <h1 id="login-title">Welcome back</h1>
+      <p class="sub">Log into your account to continue.</p>
+      <div id="form-error" class="error" role="alert"></div>
+      <form method="post" id="login-form" novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <div class="input">
+            <input type="text" id="username" name="username" autocomplete="username" placeholder="yourname" required />
+          </div>
+          <div class="hint" id="username-hint" aria-live="polite"></div>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input">
+            <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required minlength="4" />
+            <button class="toggle" type="button" id="togglePw" aria-label="Show password">Show</button>
+          </div>
+          <div class="hint" id="password-hint" aria-live="polite"></div>
+        </div>
+        <div class="actions">
+          <a class="muted" href="/register">No account? Register</a>
+          <button class="btn" type="submit" id="submitBtn">Login</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const username = document.getElementById('username');
+    const password = document.getElementById('password');
+    const err = document.getElementById('form-error');
+    const submitBtn = document.getElementById('submitBtn');
+    const togglePw = document.getElementById('togglePw');
+
+    togglePw.addEventListener('click', () => {
+      const isHidden = password.type === 'password';
+      password.type = isHidden ? 'text' : 'password';
+      togglePw.textContent = isHidden ? 'Hide' : 'Show';
+      togglePw.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+    });
+
+    function setLoading(isLoading){
+      if(isLoading){
+        submitBtn.disabled = true;
+        submitBtn.dataset.prev = submitBtn.textContent;
+        submitBtn.textContent = 'Logging in…';
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.textContent = submitBtn.dataset.prev || 'Login';
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      if(!username.value.trim() || !password.value.trim()){
+        e.preventDefault();
+        err.style.display = 'block';
+        err.textContent = 'Please enter both username and password.';
+        return;
+      }
+      setLoading(true);
+      // Let the request proceed; if server returns quickly, the button will reset on page load
+      setTimeout(() => setLoading(false), 4000);
+    });
+  </script>
+</body>
+</html>

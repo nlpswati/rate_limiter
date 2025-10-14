@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard • Rate Limiter</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22d3ee; --accent-2:#60a5fa; --line: rgba(148,163,184,.18); --good:#10b981; --warn:#f59e0b; --bad:#ef4444; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; color:var(--text); background: radial-gradient(1200px 800px at 80% -10%, rgba(34,211,238,.15), transparent 40%), radial-gradient(1000px 700px at -20% 10%, rgba(96,165,250,.12), transparent 45%), var(--bg); min-height:100vh; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { max-width:1100px; margin:0 auto; padding:24px; display:flex; flex-direction:column; gap:18px; }
+    .nav { display:flex; justify-content:space-between; align-items:center; background:rgba(17,24,39,.6); backdrop-filter: blur(8px); border:1px solid var(--line); border-radius:14px; padding:10px 14px; position:sticky; top:12px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; }
+    .logo { width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); display:grid; place-items:center; font-size:16px; color:#0b1220; font-weight:900; }
+    .link { padding:8px 12px; border-radius:10px; border:1px solid transparent; }
+    .link:hover { background:rgba(148,163,184,.08); border-color:var(--line); }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; }
+    .card { background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00)); border:1px solid var(--line); border-radius:16px; padding:16px; }
+    .card h2 { margin:4px 0 10px; font-size:18px; }
+    .kpis { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+    .kpi { border:1px solid var(--line); border-radius:12px; padding:12px; background:rgba(17,24,39,.6); }
+    .kpi .num { font-weight:800; font-size:22px; }
+    .kpi .label { color:var(--muted); font-size:12px; }
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+    .table th { color:var(--muted); font-weight:600; }
+    .status { padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); color:var(--muted); }
+    .pill { padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid var(--line); color:#fff; }
+    .pill.ok { background: rgba(16,185,129,.15); border-color: rgba(16,185,129,.35); }
+    .pill.warn { background: rgba(245,158,11,.15); border-color: rgba(245,158,11,.35); }
+    .pill.bad { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.35); }
+    @media (max-width: 900px) { .kpis{grid-template-columns: repeat(2,1fr);} }
+    @media (max-width: 600px) { .kpis{grid-template-columns: 1fr;} .grid{grid-template-columns: 1fr;} }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav" aria-label="Primary">
+      <div class="brand"><div class="logo" aria-hidden>RL</div>Rate Limiter</div>
+      <div>
+        <a class="link" href="/">Home</a>
+        <a class="link" href="/login">Logout</a>
+      </div>
+    </nav>
+
+    <section class="grid">
+      <div class="card" style="grid-column: span 12;">
+        <h2>Overview</h2>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="num" id="kpi-users">0</div>
+            <div class="label">Total users</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-keys">0</div>
+            <div class="label">API keys</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-reqs">0</div>
+            <div class="label">Total requests</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-limited">0</div>
+            <div class="label">Rate limited</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 12;">
+        <h2>Users</h2>
+        <table class="table" role="table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>API Key</th>
+              <th>Per Minute</th>
+              <th>Total Requests</th>
+              <th>Rate Limited</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for u in users %}
+            <tr>
+              <td>{{ u.username }}</td>
+              <td><code style="font-size:12px">{{ u.api_key }}</code></td>
+              <td><span class="pill {{ 'ok' if u.limit_per_minute >= 10 else ('warn' if u.limit_per_minute >= 5 else 'bad') }}">{{ u.limit_per_minute }}</span></td>
+              <td>{{ u.total_requests }}</td>
+              <td>{{ u.rate_limited }}</td>
+              <td><a class="link" href="/user/{{ u.id }}">View logs</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Animate KPIs in a subtle way
+    function animate(el, to){
+      const start = 0; const dur = 900; const t0 = performance.now();
+      const step = (now)=>{ const p = Math.min(1, (now-t0)/dur); const val = Math.round(start + (to-start)*p); el.textContent = val; if(p<1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }
+    const users = {{ users|length }};
+    const totals = {
+      users: users,
+      keys: users, // one key per user in this demo
+      reqs: {{ users|sum(attribute='total_requests') }},
+      limited: {{ users|sum(attribute='rate_limited') }}
+    };
+    animate(document.getElementById('kpi-users'), totals.users);
+    animate(document.getElementById('kpi-keys'), totals.keys);
+    animate(document.getElementById('kpi-reqs'), totals.reqs);
+    animate(document.getElementById('kpi-limited'), totals.limited);
+  </script>
+</body>
+</html>
+
