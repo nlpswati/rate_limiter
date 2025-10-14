@@ -40,7 +40,7 @@
 <body>
   <div class="wrap">
     <nav class="nav" aria-label="Primary">
-      <div class="brand"><div class="logo" aria-hidden>RL</div>Rate Limiter</div>
+      <div class="brand"><div class="logo" aria-hidden>RL</div>Rate Limiter — Admin</div>
       <div>
         <a class="link" href="/">Home</a>
         <a class="link" href="/login">Logout</a>
@@ -76,10 +76,10 @@
           <thead>
             <tr>
               <th>Username</th>
-              <th>API Key</th>
-              <th>Per Minute</th>
+              <th>User RPM</th>
               <th>Total Requests</th>
               <th>Rate Limited</th>
+              <th>Keys</th>
               <th></th>
             </tr>
           </thead>
@@ -87,10 +87,20 @@
           {% for u in users %}
             <tr>
               <td>{{ u.username }}</td>
-              <td><code style="font-size:12px">{{ u.api_key }}</code></td>
-              <td><span class="pill {{ 'ok' if u.limit_per_minute >= 10 else ('warn' if u.limit_per_minute >= 5 else 'bad') }}">{{ u.limit_per_minute }}</span></td>
+              <td><span class="pill {{ 'ok' if u.limit_per_minute >= 200 else ('warn' if u.limit_per_minute >= 30 else 'bad') }}">{{ u.limit_per_minute }}</span></td>
               <td>{{ u.total_requests }}</td>
               <td>{{ u.rate_limited }}</td>
+              <td>
+                {% if u.api_keys|length == 0 %}
+                  <span class="status">No keys</span>
+                {% else %}
+                  <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  {% for k in u.api_keys %}
+                    <div class="pill {{ 'ok' if k.active else 'bad' }}" title="{{ k.limit_per_minute }} rpm / {{ k.limit_per_day or '∞' }} rpd — Expires: {{ (k.expires_at[:10]) if k.expires_at else '—' }}">{{ k.tier|capitalize }} • {{ 'Active' if k.active else 'Expired' }}</div>
+                  {% endfor %}
+                  </div>
+                {% endif %}
+              </td>
               <td><a class="link" href="/user/{{ u.id }}">View logs</a></td>
             </tr>
           {% endfor %}
@@ -107,17 +117,10 @@
       const step = (now)=>{ const p = Math.min(1, (now-t0)/dur); const val = Math.round(start + (to-start)*p); el.textContent = val; if(p<1) requestAnimationFrame(step); };
       requestAnimationFrame(step);
     }
-    const users = {{ users|length }};
-    const totals = {
-      users: users,
-      keys: users, // one key per user in this demo
-      reqs: {{ users|sum(attribute='total_requests') }},
-      limited: {{ users|sum(attribute='rate_limited') }}
-    };
-    animate(document.getElementById('kpi-users'), totals.users);
-    animate(document.getElementById('kpi-keys'), totals.keys);
-    animate(document.getElementById('kpi-reqs'), totals.reqs);
-    animate(document.getElementById('kpi-limited'), totals.limited);
+    animate(document.getElementById('kpi-users'), {{ totals.users }});
+    animate(document.getElementById('kpi-keys'), {{ totals.keys }});
+    animate(document.getElementById('kpi-reqs'), {{ totals.reqs }});
+    animate(document.getElementById('kpi-limited'), {{ totals.limited }});
   </script>
 </body>
 </html>
