@@ -48,25 +48,99 @@
     </nav>
 
     <section class="grid">
+      <!-- System Health & Overview -->
       <div class="card" style="grid-column: span 12;">
-        <h2>Overview</h2>
+        <h2>System Overview</h2>
         <div class="kpis">
           <div class="kpi">
-            <div class="num" id="kpi-users">0</div>
-            <div class="label">Total users</div>
+            <div class="num" id="kpi-users">{{ totals.users }}</div>
+            <div class="label">Total Users</div>
           </div>
           <div class="kpi">
-            <div class="num" id="kpi-keys">0</div>
-            <div class="label">API keys</div>
+            <div class="num" id="kpi-active-keys">{{ totals.active_keys }}</div>
+            <div class="label">Active Keys</div>
           </div>
           <div class="kpi">
-            <div class="num" id="kpi-reqs">0</div>
-            <div class="label">Total requests</div>
+            <div class="num" id="kpi-success-rate">{{ totals.success_rate }}%</div>
+            <div class="label">Success Rate</div>
           </div>
           <div class="kpi">
-            <div class="num" id="kpi-limited">0</div>
-            <div class="label">Rate limited</div>
+            <div class="num" id="kpi-health" style="color: {% if totals.system_health == 'excellent' %}var(--good){% elif totals.system_health == 'good' %}var(--accent){% elif totals.system_health == 'warning' %}var(--warn){% else %}var(--bad){% endif %};">{{ totals.system_health|title }}</div>
+            <div class="label">System Health</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Activity Metrics -->
+      <div class="card" style="grid-column: span 8;">
+        <h2>Activity Metrics</h2>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="num" id="kpi-hour">{{ totals.requests_last_hour }}</div>
+            <div class="label">Last Hour</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-24h">{{ totals.requests_last_24h }}</div>
+            <div class="label">Last 24h</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-7d">{{ totals.requests_last_7d }}</div>
+            <div class="label">Last 7d</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-total">{{ totals.reqs }}</div>
+            <div class="label">Total Requests</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rate Limiting Stats -->
+      <div class="card" style="grid-column: span 4;">
+        <h2>Rate Limiting</h2>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="kpi">
+            <div class="num" id="kpi-limited-hour">{{ totals.rate_limited_last_hour }}</div>
+            <div class="label">Limited (1h)</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-limited-24h">{{ totals.rate_limited_last_24h }}</div>
+            <div class="label">Limited (24h)</div>
+          </div>
+          <div class="kpi">
+            <div class="num" id="kpi-limited-total">{{ totals.limited }}</div>
+            <div class="label">Total Limited</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Users & Recent Activity -->
+      <div class="card" style="grid-column: span 6;">
+        <h2>Top Users by Activity</h2>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          {% for user in totals.top_users %}
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:rgba(17,24,39,.3); border-radius:8px;">
+            <span style="font-weight:600;">{{ user.username }}</span>
+            <span class="pill ok">{{ user.total_requests }} requests</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: span 6;">
+        <h2>Recent Activity</h2>
+        <div style="max-height:200px; overflow-y:auto;">
+          {% for activity in totals.recent_activity %}
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--line); font-size:12px;">
+            <div>
+              <span style="font-weight:600;">User {{ activity.user_id }}</span>
+              <span class="muted">{{ activity.endpoint }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="pill {{ 'ok' if activity.status == 'ok' else 'bad' }}" style="font-size:10px;">{{ activity.status|title }}</span>
+              <span class="muted">{{ activity.timestamp.strftime('%H:%M') }}</span>
+            </div>
+          </div>
+          {% endfor %}
         </div>
       </div>
 
@@ -117,10 +191,136 @@
       const step = (now)=>{ const p = Math.min(1, (now-t0)/dur); const val = Math.round(start + (to-start)*p); el.textContent = val; if(p<1) requestAnimationFrame(step); };
       requestAnimationFrame(step);
     }
+
+    // Animate text values (like success rate)
+    function animateText(el, to){
+      const currentText = el.textContent;
+      if (currentText !== to.toString()) {
+        el.textContent = to;
+      }
+    }
+
+    // Initial animations
     animate(document.getElementById('kpi-users'), {{ totals.users }});
-    animate(document.getElementById('kpi-keys'), {{ totals.keys }});
-    animate(document.getElementById('kpi-reqs'), {{ totals.reqs }});
-    animate(document.getElementById('kpi-limited'), {{ totals.limited }});
+    animate(document.getElementById('kpi-active-keys'), {{ totals.active_keys }});
+    animateText(document.getElementById('kpi-success-rate'), '{{ totals.success_rate }}%');
+    animate(document.getElementById('kpi-hour'), {{ totals.requests_last_hour }});
+    animate(document.getElementById('kpi-24h'), {{ totals.requests_last_24h }});
+    animate(document.getElementById('kpi-7d'), {{ totals.requests_last_7d }});
+    animate(document.getElementById('kpi-total'), {{ totals.reqs }});
+    animate(document.getElementById('kpi-limited-hour'), {{ totals.rate_limited_last_hour }});
+    animate(document.getElementById('kpi-limited-24h'), {{ totals.rate_limited_last_24h }});
+    animate(document.getElementById('kpi-limited-total'), {{ totals.limited }});
+
+    // Auto-refresh dashboard every 5 seconds to show real-time updates
+    let refreshInterval;
+    
+    function refreshDashboard() {
+      // Add a subtle loading indicator
+      const nav = document.querySelector('.nav');
+      const originalContent = nav.innerHTML;
+      nav.innerHTML = '<div class="brand"><div class="logo" aria-hidden>RL</div>Rate Limiter — Admin <span style="color: var(--accent); font-size: 12px;">(updating...)</span></div><div><a class="link" href="/">Home</a><a class="link" href="/login">Logout</a></div>';
+      
+      fetch(window.location.href, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => response.text())
+      .then(html => {
+        // Parse the new HTML and extract the content
+        const parser = new DOMParser();
+        const newDoc = parser.parseFromString(html, 'text/html');
+        
+        // Update tables and lists
+        const newTable = newDoc.querySelector('.table tbody');
+        const newTopUsers = newDoc.querySelector('.card:nth-child(5) .card > div');
+        const newRecentActivity = newDoc.querySelector('.card:nth-child(6) .card > div');
+        
+        if (newTable) {
+          const currentTable = document.querySelector('.table tbody');
+          if (currentTable) {
+            currentTable.innerHTML = newTable.innerHTML;
+          }
+        }
+        
+        if (newTopUsers) {
+          const currentTopUsers = document.querySelector('.card:nth-child(5) .card > div');
+          if (currentTopUsers) {
+            currentTopUsers.innerHTML = newTopUsers.innerHTML;
+          }
+        }
+        
+        if (newRecentActivity) {
+          const currentRecentActivity = document.querySelector('.card:nth-child(6) .card > div');
+          if (currentRecentActivity) {
+            currentRecentActivity.innerHTML = newRecentActivity.innerHTML;
+          }
+        }
+        
+        // Update KPI values with animation
+        const newKpis = newDoc.querySelectorAll('.kpi .num');
+        const kpiElements = document.querySelectorAll('.kpi .num');
+        
+        if (newKpis.length > 0 && kpiElements.length > 0) {
+          newKpis.forEach((newKpi, index) => {
+            if (kpiElements[index] && newKpi.textContent !== kpiElements[index].textContent) {
+              const newValue = newKpi.textContent;
+              const currentValue = kpiElements[index].textContent;
+              
+              // Check if it's a percentage or regular number
+              if (newValue.includes('%')) {
+                animateText(kpiElements[index], newValue);
+              } else {
+                const numValue = parseInt(newValue) || 0;
+                const currentNumValue = parseInt(currentValue) || 0;
+                if (numValue !== currentNumValue) {
+                  animate(kpiElements[index], numValue);
+                }
+              }
+            }
+          });
+        }
+        
+        // Update system health color
+        const newHealthElement = newDoc.querySelector('#kpi-health');
+        const currentHealthElement = document.querySelector('#kpi-health');
+        if (newHealthElement && currentHealthElement && newHealthElement.textContent !== currentHealthElement.textContent) {
+          currentHealthElement.textContent = newHealthElement.textContent;
+          currentHealthElement.style.color = newHealthElement.style.color;
+        }
+        
+        // Restore original nav content
+        nav.innerHTML = originalContent;
+      })
+      .catch(error => {
+        console.error('Failed to refresh dashboard:', error);
+        // Restore original nav content on error
+        nav.innerHTML = originalContent;
+      });
+    }
+    
+    // Start auto-refresh every 5 seconds
+    refreshInterval = setInterval(refreshDashboard, 5000);
+    
+    // Stop auto-refresh when page becomes hidden (user switches tabs)
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        clearInterval(refreshInterval);
+      } else {
+        // Restart auto-refresh when page becomes visible again
+        refreshInterval = setInterval(refreshDashboard, 5000);
+        // Also refresh immediately when coming back
+        refreshDashboard();
+      }
+    });
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+      clearInterval(refreshInterval);
+    });
   </script>
 </body>
 </html>

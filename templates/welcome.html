@@ -42,7 +42,7 @@
 
     <section class="card">
       <h1>Welcome, {{ username }}!</h1>
-      <p class="muted">Here is your API key and current subscription tier.</p>
+      <!-- <p class="muted">Here is your API key and current subscription tier.</p>
       <div class="box" style="justify-content:space-between; gap:14px; flex-wrap:wrap;">
         <div>
           <div class="muted" style="font-size:12px">Your API Key</div>
@@ -83,7 +83,7 @@
             <button class="btn" type="submit">Update Plan</button>
           </form>
         </div>
-      </div>
+      </div> -->
     </section>
 
     <section class="card">
@@ -131,8 +131,8 @@
           <option value="pro">Pro (Startup)</option>
           <option value="enterprise">Enterprise (Custom)</option>
         </select>
-        <label class="muted" for="expires">Expires</label>
-        <input id="expires" name="expires" type="date" style="padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:rgba(17,24,39,.6); color:var(--text);" />
+        <!-- <label class="muted" for="expires">Expires</label> -->
+        <!-- <input id="expires" name="expires" type="date" style="padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:rgba(17,24,39,.6); color:var(--text);" /> -->
         <button class="btn" type="submit">Create API Key</button>
       </form>
       <div style="overflow:auto;">
@@ -142,7 +142,7 @@
               <th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">Key</th>
               <th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">Plan</th>
               <th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">Status</th>
-              <th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">Expires</th>
+              <!-- <th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">Expires</th> -->
               <th style="text-align:left; padding:8px; border-bottom:1px solid var(--line); color:var(--muted);">Actions</th>
             </tr>
           </thead>
@@ -182,6 +182,67 @@
     copyBtn?.addEventListener('click', async () => {
       const text = document.getElementById('apiKey').textContent;
       try { await navigator.clipboard.writeText(text); copyBtn.textContent = 'Copied!'; setTimeout(()=> copyBtn.textContent='Copy', 1200); } catch(e){ copyBtn.textContent='Copy failed'; setTimeout(()=> copyBtn.textContent='Copy', 1200); }
+    });
+
+    // Auto-refresh welcome page every 3 seconds to show real-time key status updates
+    let refreshInterval;
+    
+    function refreshWelcomePage() {
+      // Add a subtle loading indicator
+      const nav = document.querySelector('.nav');
+      const originalContent = nav.innerHTML;
+      nav.innerHTML = '<div class="brand"><div class="logo" aria-hidden>RL</div>Rate Limiter <span style="color: var(--accent); font-size: 12px;">(updating...)</span></div><div><a class="btn" href="/dashboard">Admin Dashboard</a></div>';
+      
+      fetch(window.location.href, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => response.text())
+      .then(html => {
+        // Parse the new HTML and extract the table content
+        const parser = new DOMParser();
+        const newDoc = parser.parseFromString(html, 'text/html');
+        const newTable = newDoc.querySelector('table tbody');
+        
+        if (newTable) {
+          // Update the table content
+          const currentTable = document.querySelector('table tbody');
+          if (currentTable) {
+            currentTable.innerHTML = newTable.innerHTML;
+          }
+        }
+        
+        // Restore original nav content
+        nav.innerHTML = originalContent;
+      })
+      .catch(error => {
+        console.error('Failed to refresh welcome page:', error);
+        // Restore original nav content on error
+        nav.innerHTML = originalContent;
+      });
+    }
+    
+    // Start auto-refresh every 3 seconds
+    refreshInterval = setInterval(refreshWelcomePage, 3000);
+    
+    // Stop auto-refresh when page becomes hidden (user switches tabs)
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        clearInterval(refreshInterval);
+      } else {
+        // Restart auto-refresh when page becomes visible again
+        refreshInterval = setInterval(refreshWelcomePage, 3000);
+        // Also refresh immediately when coming back
+        refreshWelcomePage();
+      }
+    });
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+      clearInterval(refreshInterval);
     });
   </script>
 </body>

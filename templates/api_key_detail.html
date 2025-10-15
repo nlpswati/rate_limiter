@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ api_key.key[:8] }}... • API Key Details</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#22d3ee; --accent-2:#60a5fa; --line: rgba(148,163,184,.18); --good:#10b981; --warn:#f59e0b; --bad:#ef4444; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; color:var(--text); background: radial-gradient(1200px 800px at 80% -10%, rgba(34,211,238,.15), transparent 40%), radial-gradient(1000px 700px at -20% 10%, rgba(96,165,250,.12), transparent 45%), var(--bg); min-height:100vh; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { max-width:1100px; margin:0 auto; padding:24px; display:flex; flex-direction:column; gap:16px; }
+    .nav { display:flex; justify-content:space-between; align-items:center; background:rgba(17,24,39,.6); backdrop-filter: blur(8px); border:1px solid var(--line); border-radius:14px; padding:10px 14px; position:sticky; top:12px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; }
+    .logo { width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); display:grid; place-items:center; font-size:16px; color:#0b1220; font-weight:900; }
+    .card { background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.00)); border:1px solid var(--line); border-radius:16px; padding:16px; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; }
+    .kpi { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+    .tile { border:1px solid var(--line); border-radius:12px; padding:12px; background:rgba(17,24,39,.6); }
+    .muted { color:var(--muted); }
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); font-size:14px; }
+    .table th { color:var(--muted); font-weight:600; }
+    .status { padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); color:var(--muted); }
+    .pill { padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid var(--line); color:#fff; }
+    .pill.ok { background: rgba(16,185,129,.15); border-color: rgba(16,185,129,.35); }
+    .pill.warn { background: rgba(245,158,11,.15); border-color: rgba(245,158,11,.35); }
+    .pill.bad { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.35); }
+    .key-display { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: rgba(17,24,39,.6); border:1px solid var(--line); border-radius:8px; padding:12px; margin:8px 0; }
+    @media (max-width: 900px) { .kpi{grid-template-columns: repeat(2,1fr);} }
+    @media (max-width: 600px) { .kpi{grid-template-columns: 1fr;} .grid{grid-template-columns: 1fr;} }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav">
+      <div class="brand">
+        <div class="logo" aria-hidden>RL</div>
+        API Key Details • {{ user.username }}
+      </div>
+      <div>
+        <a href="/user/{{ user.id }}" style="color: var(--accent); text-decoration: underline;">← Back to User</a>
+        <a href="/dashboard" style="margin-left: 12px;">Dashboard</a>
+      </div>
+    </nav>
+
+    <section class="card">
+      <h1 style="margin:4px 0 8px; font-size:24px;">API Key Information</h1>
+      <div class="key-display">
+        <div class="muted" style="font-size:12px; margin-bottom:4px;">API Key</div>
+        <div style="font-size:14px; word-break: break-all;">{{ api_key.key }}</div>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:12px;">
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Plan</div>
+          <div style="font-size:18px; font-weight:700;">{{ api_key.tier|capitalize }}</div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Status</div>
+          <div>
+            <span class="pill {{ 'ok' if api_key.active else 'bad' }}">{{ 'Active' if api_key.active else 'Expired' }}</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Rate Limit (per minute)</div>
+          <div style="font-size:18px; font-weight:700;">{{ api_key.limit_per_minute }}</div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Rate Limit (per day)</div>
+          <div style="font-size:18px; font-weight:700;">{{ api_key.limit_per_day or '∞' }}</div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Expires</div>
+          <div style="font-size:14px;">{{ api_key.expires_at.strftime('%Y-%m-%d %H:%M') if api_key.expires_at else 'Never' }}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin:4px 0 8px; font-size:18px;">Usage Statistics (30 days)</h2>
+      <div class="kpi">
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Total Requests</div>
+          <div style="font-size:22px; font-weight:800;">{{ total_ok }}</div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Rate Limited</div>
+          <div style="font-size:22px; font-weight:800;">{{ total_limited }}</div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Success Rate</div>
+          <div style="font-size:22px; font-weight:800;">
+            {% set success_rate = ((total_ok / (total_ok + total_limited)) * 100) if (total_ok + total_limited) > 0 else 0 %}
+            {{ "%.1f"|format(success_rate) }}%
+          </div>
+        </div>
+        <div class="tile">
+          <div class="muted" style="font-size:12px;">Last Hour Requests</div>
+          <div style="font-size:22px; font-weight:800;">{{ key_requests_last_hour }}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card" style="grid-column: span 12;">
+        <h3 style="margin:6px 0 8px;">Last Hour by Minute</h3>
+        <div id="chart1h"></div>
+      </div>
+      <div class="card" style="grid-column: span 12;">
+        <h3 style="margin:6px 0 8px;">Last 24h by Hour</h3>
+        <div id="chart24h"></div>
+      </div>
+      <div class="card" style="grid-column: span 12;">
+        <h3 style="margin:6px 0 8px;">Last 30 Days</h3>
+        <div id="chart30d"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 style="margin:4px 0 8px; font-size:18px;">Recent Requests (Last 50)</h2>
+      <div style="overflow:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Status</th>
+              <th>Endpoint</th>
+              <th>Response Time</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for req in recent_requests %}
+            <tr>
+              <td>{{ req.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td>
+                <span class="pill {{ 'ok' if req.status == 'ok' else 'bad' }}">
+                  {{ req.status|title }}
+                </span>
+              </td>
+              <td><code>{{ req.endpoint }}</code></td>
+              <td>{{ "%.3f"|format(req.response_time) }}s</td>
+            </tr>
+          {% endfor %}
+          {% if recent_requests|length == 0 %}
+            <tr>
+              <td colspan="4" style="text-align:center; color:var(--muted); padding:20px;">No requests found for this API key</td>
+            </tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Auto-refresh every 5 seconds
+    let refreshInterval;
+    
+    function refreshApiKeyDetails() {
+      fetch(window.location.href, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      .then(response => response.text())
+      .then(html => {
+        const parser = new DOMParser();
+        const newDoc = parser.parseFromString(html, 'text/html');
+        
+        // Update charts
+        const chart1h = newDoc.querySelector('#chart1h');
+        const chart24h = newDoc.querySelector('#chart24h');
+        const chart30d = newDoc.querySelector('#chart30d');
+        if (chart1h && chart24h && chart30d) {
+          document.getElementById('chart1h').innerHTML = chart1h.innerHTML;
+          document.getElementById('chart24h').innerHTML = chart24h.innerHTML;
+          document.getElementById('chart30d').innerHTML = chart30d.innerHTML;
+          // Re-render charts
+          setTimeout(() => {
+            renderCharts();
+          }, 100);
+        }
+        
+        // Update recent requests table
+        const newTable = newDoc.querySelector('.table tbody');
+        if (newTable) {
+          document.querySelector('.table tbody').innerHTML = newTable.innerHTML;
+        }
+      })
+      .catch(error => {
+        console.error('Failed to refresh API key details:', error);
+      });
+    }
+    
+    function renderCharts() {
+      // Last hour by minute chart
+      const minuteLabels = {{ minute_labels | tojson }};
+      const minuteOk = {{ minute_ok | tojson }};
+      const minuteLimited = {{ minute_limited | tojson }};
+      
+      Plotly.newPlot('chart1h', [
+        { x: minuteLabels, y: minuteOk, type: 'bar', name: 'OK', marker:{color:'#22d3ee'} },
+        { x: minuteLabels, y: minuteLimited, type: 'bar', name: 'Rate Limited', marker:{color:'#ef4444'} }
+      ], { 
+        barmode: 'stack', 
+        margin:{t:10}, 
+        paper_bgcolor:'rgba(0,0,0,0)', 
+        plot_bgcolor:'rgba(0,0,0,0)', 
+        font:{color:'#e5e7eb'},
+        title: 'Requests per Minute (Last Hour)',
+        xaxis: {
+          tickangle: -45,
+          tickformat: '%H:%M'
+        }
+      });
+
+      // Last 24 hours by hour chart
+      const hourLabels = {{ hour_labels | tojson }};
+      const hourOk = {{ hour_ok | tojson }};
+      const hourLimited = {{ hour_limited | tojson }};
+      
+      Plotly.newPlot('chart24h', [
+        { x: hourLabels, y: hourOk, type: 'bar', name: 'OK', marker:{color:'#22d3ee'} },
+        { x: hourLabels, y: hourLimited, type: 'bar', name: 'Rate Limited', marker:{color:'#ef4444'} }
+      ], { 
+        barmode: 'stack', 
+        margin:{t:10}, 
+        paper_bgcolor:'rgba(0,0,0,0)', 
+        plot_bgcolor:'rgba(0,0,0,0)', 
+        font:{color:'#e5e7eb'},
+        title: 'Requests per Hour (Last 24h)'
+      });
+
+      // Last 30 days chart
+      const dayLabels = {{ day_labels | tojson }};
+      const dayOk = {{ day_ok | tojson }};
+      const dayLimited = {{ day_limited | tojson }};
+      
+      Plotly.newPlot('chart30d', [
+        { x: dayLabels, y: dayOk, type: 'scatter', name: 'OK', line:{color:'#60a5fa'} },
+        { x: dayLabels, y: dayLimited, type: 'scatter', name: 'Rate Limited', line:{color:'#f59e0b'} }
+      ], { 
+        margin:{t:10}, 
+        paper_bgcolor:'rgba(0,0,0,0)', 
+        plot_bgcolor:'rgba(0,0,0,0)', 
+        font:{color:'#e5e7eb'},
+        title: 'Requests per Day (Last 30d)'
+      });
+    }
+    
+    // Initial chart render
+    renderCharts();
+    
+    // Start auto-refresh every 5 seconds
+    refreshInterval = setInterval(refreshApiKeyDetails, 5000);
+    
+    // Stop auto-refresh when page becomes hidden
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        clearInterval(refreshInterval);
+      } else {
+        refreshInterval = setInterval(refreshApiKeyDetails, 5000);
+        refreshApiKeyDetails();
+      }
+    });
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+      clearInterval(refreshInterval);
+    });
+  </script>
+</body>
+</html>

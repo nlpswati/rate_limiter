@@ -38,10 +38,10 @@
     </section>
 
     <section class="grid">
-      <div class="card" style="grid-column: span 12;">
+      <!-- <div class="card" style="grid-column: span 12;">
         <h3 style="margin:6px 0 8px;">Last 24h by hour</h3>
         <div id="chart24h"></div>
-      </div>
+      </div> -->
       <div class="card" style="grid-column: span 12;">
         <h3 style="margin:6px 0 8px;">Last 30 days</h3>
         <div id="chart30d"></div>
@@ -53,7 +53,7 @@
           <tbody>
           {% for k in keys %}
             <tr>
-              <td><code style="font-size:12px;">{{ k.key }}</code></td>
+              <td><a href="/user/{{ user.id }}/key/{{ k.key }}" style="color: #22d3ee; text-decoration: underline; cursor: pointer;"><code style="font-size:12px;">{{ k.key }}</code></a></td>
               <td>{{ k.tier|capitalize }}</td>
               <td>{{ 'Active' if k.active else 'Expired' }}</td>
               <td>{{ k.limit_per_minute }}</td>
@@ -71,10 +71,10 @@
     const hourLabels = {{ hour_labels | tojson }};
     const hourOk = {{ hour_ok | tojson }};
     const hourLimited = {{ hour_limited | tojson }};
-    Plotly.newPlot('chart24h', [
-      { x: hourLabels, y: hourOk, type: 'bar', name: 'OK', marker:{color:'#22d3ee'} },
-      { x: hourLabels, y: hourLimited, type: 'bar', name: 'Rate Limited', marker:{color:'#ef4444'} }
-    ], { barmode: 'stack', margin:{t:10}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#e5e7eb'} });
+    // Plotly.newPlot('chart24h', [
+    //   { x: hourLabels, y: hourOk, type: 'bar', name: 'OK', marker:{color:'#22d3ee'} },
+    //   { x: hourLabels, y: hourLimited, type: 'bar', name: 'Rate Limited', marker:{color:'#ef4444'} }
+    // ], { barmode: 'stack', margin:{t:10}, paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#e5e7eb'} });
 
     const dayLabels = {{ day_labels | tojson }};
     const dayOk = {{ day_ok | tojson }};

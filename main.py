@@ -6,7 +6,7 @@ import time
 import secrets
 
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import datetime
@@ -57,7 +57,6 @@ class APIRequestLog(Base):
 # Create DB
 engine = create_engine("sqlite:///rate_limiter.db")
 Base.metadata.create_all(engine)
-
 # Lightweight SQLite migration to add missing columns
 from sqlalchemy import text
 def _ensure_columns():
@@ -117,12 +116,12 @@ PLANS = {
     },
     "pro": {
         "name": "Pro (Startup)",
-        "rpm": 200,
+        "rpm": 15,
         "rpd": 100_000,
     },
     "enterprise": {
         "name": "Enterprise (Custom)",
-        "rpm": 1000,  # baseline; can be higher per-contract
+        "rpm": 20,  # baseline; can be higher per-contract
         "rpd": None,   # unlimited per day
     },
 }
@@ -191,14 +190,15 @@ def rate_limiter_and_log(request: Request, db: Session, user: User, api_key_valu
     # If key specified, prefer key-level limits; else fallback to user-level
     rpm_limit = None
     rpd_limit = None
+    api_key_obj = None
     if api_key_value:
-        k = db.query(ApiKey).filter(ApiKey.key == api_key_value, ApiKey.user_id == user.id).first()
-        if not k or not k.active:
+        api_key_obj = db.query(ApiKey).filter(ApiKey.key == api_key_value, ApiKey.user_id == user.id).first()
+        if not api_key_obj or not api_key_obj.active:
             raise HTTPException(status_code=403, detail="API key inactive or not found")
-        if k.expires_at and k.expires_at <= datetime.datetime.utcnow():
+        if api_key_obj.expires_at and api_key_obj.expires_at <= datetime.datetime.utcnow():
             raise HTTPException(status_code=403, detail="API key expired")
-        rpm_limit = k.limit_per_minute
-        rpd_limit = k.limit_per_day
+        rpm_limit = api_key_obj.limit_per_minute
+        rpd_limit = api_key_obj.limit_per_day
     if rpm_limit is None:
         rpm_limit = user.limit_per_minute or DEFAULT_LIMIT_PER_MINUTE
     if rpd_limit is None:
@@ -213,6 +213,24 @@ def rate_limiter_and_log(request: Request, db: Session, user: User, api_key_valu
             status="rate_limited",
             api_key=api_key_value
         ))
+        
+        # Check for consecutive rate limit violations and auto-deactivate if needed
+        if api_key_value and api_key_obj:
+            # Count recent rate-limited requests in the last 5 minutes
+            five_minutes_ago = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
+            recent_rate_limits = db.query(APIRequestLog).filter(
+                APIRequestLog.user_id == user.id,
+                APIRequestLog.timestamp >= five_minutes_ago,
+                APIRequestLog.status == "rate_limited",
+                APIRequestLog.api_key == api_key_value
+            ).count()
+            
+            # Auto-deactivate after 3 consecutive rate limit violations (for testing)
+            if recent_rate_limits >= 3:
+                api_key_obj.active = False
+                db.add(api_key_obj)
+                print(f"Auto-deactivated API key {api_key_value} due to excessive rate limiting ({recent_rate_limits} violations)")
+        
         db.commit()
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
@@ -485,6 +503,47 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     total_keys = 0
     total_requests_sum = 0
     total_rate_limited_sum = 0
+    active_keys = 0
+    expired_keys = 0
+    
+    # Calculate time-based metrics
+    now = datetime.datetime.utcnow()
+    last_hour = now - datetime.timedelta(hours=1)
+    last_24h = now - datetime.timedelta(hours=24)
+    last_7d = now - datetime.timedelta(days=7)
+    
+    requests_last_hour = db.query(APIRequestLog).filter(APIRequestLog.timestamp >= last_hour).count()
+    requests_last_24h = db.query(APIRequestLog).filter(APIRequestLog.timestamp >= last_24h).count()
+    requests_last_7d = db.query(APIRequestLog).filter(APIRequestLog.timestamp >= last_7d).count()
+    
+    rate_limited_last_hour = db.query(APIRequestLog).filter(
+        APIRequestLog.timestamp >= last_hour, 
+        APIRequestLog.status == "rate_limited"
+    ).count()
+    rate_limited_last_24h = db.query(APIRequestLog).filter(
+        APIRequestLog.timestamp >= last_24h, 
+        APIRequestLog.status == "rate_limited"
+    ).count()
+    
+    # Get top users by activity
+    try:
+        top_users = db.query(
+            User.username, 
+            func.count(APIRequestLog.id).label('total_requests')
+        ).join(APIRequestLog, User.id == APIRequestLog.user_id).group_by(
+            User.id, User.username
+        ).order_by(func.count(APIRequestLog.id).desc()).limit(5).all()
+    except Exception:
+        top_users = []
+    
+    # Get recent activity (last 10 requests)
+    try:
+        recent_activity = db.query(APIRequestLog).order_by(
+            APIRequestLog.timestamp.desc()
+        ).limit(10).all()
+    except Exception:
+        recent_activity = []
+    
     for u in users_q:
         total_requests = db.query(APIRequestLog).filter(APIRequestLog.user_id==u.id).count()
         rate_limited = db.query(APIRequestLog).filter(APIRequestLog.user_id==u.id, APIRequestLog.status=="rate_limited").count()
@@ -502,6 +561,11 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
                 "requests": key_req,
                 "limited": key_limited,
             })
+            if k.active:
+                active_keys += 1
+            else:
+                expired_keys += 1
+                
         users_view.append({
             "id": u.id,
             "username": u.username,
@@ -515,11 +579,34 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         total_requests_sum += total_requests
         total_rate_limited_sum += rate_limited
 
+    # Calculate success rate
+    success_rate = ((total_requests_sum - total_rate_limited_sum) / total_requests_sum * 100) if total_requests_sum > 0 else 0
+    
+    # Calculate system health metrics
+    system_health = "excellent"
+    if success_rate < 80:
+        system_health = "critical"
+    elif success_rate < 90:
+        system_health = "warning"
+    elif success_rate < 95:
+        system_health = "good"
+
     totals = {
         "users": len(users_view),
         "keys": total_keys,
+        "active_keys": active_keys,
+        "expired_keys": expired_keys,
         "reqs": total_requests_sum,
         "limited": total_rate_limited_sum,
+        "success_rate": round(success_rate, 1),
+        "requests_last_hour": requests_last_hour,
+        "requests_last_24h": requests_last_24h,
+        "requests_last_7d": requests_last_7d,
+        "rate_limited_last_hour": rate_limited_last_hour,
+        "rate_limited_last_24h": rate_limited_last_24h,
+        "system_health": system_health,
+        "top_users": top_users,
+        "recent_activity": recent_activity,
     }
 
     return templates.TemplateResponse("dashboard.html", {"request": request, "users": users_view, "totals": totals})
@@ -586,6 +673,131 @@ def user_details(user_id: int, request: Request, db: Session = Depends(get_db)):
         "day_limited": day_limited,
         "total_ok": total_ok,
         "total_limited": total_limited,
+    })
+
+@app.get("/user/{user_id}/key/{api_key}", response_class=HTMLResponse)
+def api_key_details(user_id: int, api_key: str, request: Request, db: Session = Depends(get_db)):
+    # Admin-only
+    session_id = request.cookies.get("session_id")
+    if not session_id or sessions.get(session_id) != "admin":
+        return RedirectResponse("/login")
+
+    user = db.query(User).filter(User.id==user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    key_obj = db.query(ApiKey).filter(ApiKey.key==api_key, ApiKey.user_id==user_id).first()
+    if not key_obj:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    # Aggregate usage for this specific API key: last hour by minute, last 24 hours by hour, last 30 days by day
+    now = datetime.datetime.utcnow()
+    
+    # Prepare buckets for last hour (by minute)
+    minutes = [now - datetime.timedelta(minutes=i) for i in range(59,-1,-1)]
+    minute_labels = [m.replace(second=0, microsecond=0) for m in minutes]
+    minute_ok = [0]*60
+    minute_limited = [0]*60
+    
+    # Prepare buckets for last 24 hours (by hour)
+    hours = [now - datetime.timedelta(hours=i) for i in range(23,-1,-1)]
+    hour_labels = [h.replace(minute=0, second=0, microsecond=0) for h in hours]
+    hour_ok = [0]*24
+    hour_limited = [0]*24
+
+    # Prepare buckets for last 30 days (by day)
+    day_points = [now - datetime.timedelta(days=i) for i in range(29,-1,-1)]
+    day_labels = [d.replace(hour=0, minute=0, second=0, microsecond=0) for d in day_points]
+    day_ok = [0]*30
+    day_limited = [0]*30
+
+    # Fetch logs for this specific API key - last hour (by minute)
+    logs_last_hour = db.query(APIRequestLog).filter(
+        APIRequestLog.user_id==user_id, 
+        APIRequestLog.api_key==api_key,
+        APIRequestLog.timestamp >= now - datetime.timedelta(hours=1)
+    ).all()
+    for log in logs_last_hour:
+        ts = log.timestamp.replace(second=0, microsecond=0)
+        if ts in minute_labels:
+            idx = minute_labels.index(ts)
+            if log.status == "ok":
+                minute_ok[idx] += 1
+            else:
+                minute_limited[idx] += 1
+
+    # Fetch logs for this specific API key - last 24 hours (by hour)
+    logs_24h = db.query(APIRequestLog).filter(
+        APIRequestLog.user_id==user_id, 
+        APIRequestLog.api_key==api_key,
+        APIRequestLog.timestamp >= now - datetime.timedelta(hours=24)
+    ).all()
+    for log in logs_24h:
+        ts = log.timestamp.replace(minute=0, second=0, microsecond=0)
+        if ts in hour_labels:
+            idx = hour_labels.index(ts)
+            if log.status == "ok":
+                hour_ok[idx] += 1
+            else:
+                hour_limited[idx] += 1
+
+    logs_30d = db.query(APIRequestLog).filter(
+        APIRequestLog.user_id==user_id, 
+        APIRequestLog.api_key==api_key,
+        APIRequestLog.timestamp >= now - datetime.timedelta(days=30)
+    ).all()
+    for log in logs_30d:
+        ts = log.timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+        if ts in day_labels:
+            idx = day_labels.index(ts)
+            if log.status == "ok":
+                day_ok[idx] += 1
+            else:
+                day_limited[idx] += 1
+
+    # Summary cards for this API key
+    total_ok = sum(day_ok)
+    total_limited = sum(day_limited)
+    
+    # Get recent requests for this key (last 50)
+    recent_requests = db.query(APIRequestLog).filter(
+        APIRequestLog.user_id==user_id,
+        APIRequestLog.api_key==api_key
+    ).order_by(APIRequestLog.timestamp.desc()).limit(50).all()
+
+    # Calculate key-specific metrics
+    key_requests_last_hour = db.query(APIRequestLog).filter(
+        APIRequestLog.user_id==user_id,
+        APIRequestLog.api_key==api_key,
+        APIRequestLog.timestamp >= now - datetime.timedelta(hours=1),
+        APIRequestLog.status == "ok"
+    ).count()
+    
+    key_rate_limits_last_hour = db.query(APIRequestLog).filter(
+        APIRequestLog.user_id==user_id,
+        APIRequestLog.api_key==api_key,
+        APIRequestLog.timestamp >= now - datetime.timedelta(hours=1),
+        APIRequestLog.status == "rate_limited"
+    ).count()
+
+    return templates.TemplateResponse("api_key_detail.html", {
+        "request": request,
+        "user": user,
+        "api_key": key_obj,
+        "minute_labels": [m.strftime('%H:%M') for m in minute_labels],
+        "minute_ok": minute_ok,
+        "minute_limited": minute_limited,
+        "hour_labels": [h.isoformat() for h in hour_labels],
+        "hour_ok": hour_ok,
+        "hour_limited": hour_limited,
+        "day_labels": [d.date().isoformat() for d in day_labels],
+        "day_ok": day_ok,
+        "day_limited": day_limited,
+        "total_ok": total_ok,
+        "total_limited": total_limited,
+        "recent_requests": recent_requests,
+        "key_requests_last_hour": key_requests_last_hour,
+        "key_rate_limits_last_hour": key_rate_limits_last_hour,
     })
 
 # -------------------------
