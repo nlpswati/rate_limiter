@@ -281,7 +281,6 @@ def deactivate_expired_keys(db: Session):
 # -------------------------
 def _is_expired(entry, now_ts):
     return entry is None or entry.get("expires_at", 0) <= now_ts
-
 def increment_with_ttl(scope, key, ttl_seconds, now_ts):
     bucket = counters[scope]
     entry = bucket.get(key)
@@ -411,7 +410,6 @@ def login_user(username: str = Form(...), password: str = Form(...), db: Session
     response = RedirectResponse(redirect_path, status_code=status.HTTP_302_FOUND)
     response.set_cookie(key="session_id", value=session_id, httponly=True, samesite="lax")
     return response
-
 # -------------------------
 # Welcome page showing API key and plan
 # -------------------------

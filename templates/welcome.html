@@ -93,30 +93,30 @@
           <h3>Free (Developer)</h3>
           <div class="price">$0</div>
           <ul>
-            <li>30 req/min</li>
+            <li>10 req/min</li>
             <li>5,000 req/day</li>
-            <li>Retention 7 days</li>
-            <li>Basic dashboard</li>
+            <li>Retention 1 days</li>
+            <!-- <li>Basic dashboard</li> -->
           </ul>
         </div>
         <div class="plan">
           <h3>Pro (Startup)</h3>
           <div class="price">$29/month</div>
           <ul>
-            <li>200 req/min</li>
+            <li>15 req/min</li>
             <li>100,000 req/day</li>
-            <li>Retention 30 days</li>
-            <li>Full analytics & logs, email alerts</li>
+            <li>Retention 7 days</li>
+            <!-- <li>Full analytics & logs, email alerts</li> -->
           </ul>
         </div>
         <div class="plan">
           <h3>Enterprise (Custom)</h3>
           <div class="price">$199+/month</div>
           <ul>
-            <li>1,000–10,000+ req/min</li>
+            <li>20 req/min</li>
             <li>Unlimited/day</li>
-            <li>Retention 180 days</li>
-            <li>Advanced filters, reports, priority alerts</li>
+            <li>Retention 30 days</li>
+            <!-- <li>Advanced filters, reports, priority alerts</li> -->
           </ul>
         </div>
       </div>
@@ -160,10 +160,10 @@
               </td>
               <td style="padding:8px; border-bottom:1px solid var(--line);">{{ (k.expires_at.date()|string) if k.expires_at else '-' }}</td>
               <td style="padding:8px; border-bottom:1px solid var(--line);">
-                <form method="post" action="/toggle_key" style="display:inline; margin-right:8px;">
+                <!-- <form method="post" action="/toggle_key" style="display:inline; margin-right:8px;">
                   <input type="hidden" name="key" value="{{ k.key }}" />
                   <button class="btn" type="submit">{{ 'Deactivate' if k.active else 'Activate' }}</button>
-                </form>
+                </form> -->
                 <form method="post" action="/delete_key" style="display:inline;">
                   <input type="hidden" name="key" value="{{ k.key }}" />
                   <button class="btn" type="submit">Delete</button>
